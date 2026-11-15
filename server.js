@@ -18,7 +18,7 @@ if (fs.existsSync(envPath)) {
 
 const PORT = Number(process.env.PORT) || 3000;
 const API_KEY = process.env.DEEPSEEK_API_KEY || '';
-const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 const BASE_URL = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
 const MOCK = !API_KEY;
 
@@ -83,7 +83,7 @@ async function streamDeepSeek(messages, res) {
       model: MODEL,
       stream: true,
       temperature: 1.1,
-      max_tokens: 120,
+      max_tokens: 400,
       messages: [{ role: 'system', content: persona.systemPrompt }, ...messages]
     })
   });
@@ -94,7 +94,7 @@ async function streamDeepSeek(messages, res) {
     return;
   }
   const decoder = new TextDecoder();
-  let buf = '';
+  let buf = '', wrote = false;
   for await (const chunk of upstream.body) {
     buf += decoder.decode(chunk, { stream: true });
     const lines = buf.split('\n');
@@ -106,11 +106,11 @@ async function streamDeepSeek(messages, res) {
       if (payload === '[DONE]') continue;
       try {
         const delta = JSON.parse(payload).choices?.[0]?.delta?.content;
-        if (delta) res.write(delta);
+        if (delta) { res.write(delta); wrote = true; }
       } catch { /* 忽略不完整的行 */ }
     }
   }
-  res.end();
+  res.end(wrote ? '' : '嗯……俺想太久，忘了要说啥了。');
 }
 
 async function handleChat(req, res) {
@@ -159,4 +159,19 @@ server.listen(PORT, () => {
   console.log(`\n  ${persona.name} 已上线：http://localhost:${PORT}`);
   console.log(`  OBS 采集用（隐藏控制面板）：http://localhost:${PORT}/?obs=1`);
   console.log(MOCK ? '  ⚠ 没有 DEEPSEEK_API_KEY，当前是模拟模式\n' : `  使用模型：${MODEL}\n`);
+  if (!MOCK) checkKey();
 });
+
+// 启动时检查一下 Key 和模型名对不对
+async function checkKey() {
+  try {
+    const r = await fetch(`${BASE_URL}/models`, { headers: { Authorization: `Bearer ${API_KEY}` } });
+    if (!r.ok) return console.log(`  ❌ DeepSeek Key 校验失败（HTTP ${r.status}），请检查 .env\n`);
+    const ids = ((await r.json()).data || []).map((m) => m.id);
+    console.log(ids.includes(MODEL)
+      ? `  ✅ DeepSeek 连接正常，模型 ${MODEL} 可用\n`
+      : `  ⚠ 模型 ${MODEL} 不在可用列表里：${ids.join(', ')}。请在 .env 设置 DEEPSEEK_MODEL\n`);
+  } catch (e) {
+    console.log('  ❌ 连不上 DeepSeek：', e.message, '\n');
+  }
+}

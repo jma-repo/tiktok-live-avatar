@@ -2,8 +2,7 @@
 // 流程：麦克风(Web Speech) / 评论 → /api/chat(流式) → 按句切分 → 浏览器 TTS → 嘴型动画
 (() => {
   const $ = (s) => document.querySelector(s);
-  const avatar = $('#avatar');
-  const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(location.search);
   if (params.has('obs')) document.body.classList.add('obs');
 
   const store = {
@@ -32,22 +31,16 @@
     }
   }).catch(() => { $('#status').textContent = '❌ 连不上服务器，确认 npm start 在运行'; });
 
-  // ---------- 形象状态 & 动画 ----------
-  function setMood(mood) {
-    avatar.classList.remove('thinking', 'listening');
-    if (mood) avatar.classList.add(mood);
-  }
+  // ---------- 形象状态（3D 形象在 avatar3d.js 里读取 window.avatarState） ----------
+  const avatarState = (window.avatarState ||= { mouth: 0, speaking: false, mood: null, poke: 0 });
+  function setMood(mood) { avatarState.mood = mood; }
 
-  const mouthEllipse = $('#mouthEllipse');
-  const tongue = $('#tongue');
-  const mouthOpen = $('#mouthOpen');
-  const smile = $('#smile');
-  let mouth = 0, mouthTarget = 0, lastFlap = 0;
+  let mouthTarget = 0, lastFlap = 0;
   function animate(t) {
     const speaking = state.speakingCount > 0 && speechSynthesis.speaking;
-    avatar.classList.toggle('speaking', speaking);
+    avatarState.speaking = speaking;
     if (speaking) {
-      // 没有真实音量数据，用随机开合模拟说话（约 8 次/秒）
+      // 浏览器 TTS 拿不到真实音量，用随机开合模拟说话（约 8 次/秒）
       if (t - lastFlap > 120) {
         mouthTarget = mouthTarget > 0.3 ? Math.random() * 0.25 : 0.45 + Math.random() * 0.55;
         lastFlap = t;
@@ -55,23 +48,10 @@
     } else {
       mouthTarget = 0;
     }
-    mouth += (mouthTarget - mouth) * 0.35;
-    const open = mouth > 0.05;
-    mouthOpen.setAttribute('opacity', open ? 1 : 0);
-    smile.setAttribute('opacity', open ? 0 : 1);
-    mouthEllipse.setAttribute('ry', (3 + mouth * 13).toFixed(1));
-    mouthEllipse.setAttribute('rx', (13 - mouth * 2).toFixed(1));
-    tongue.setAttribute('cy', (206 + mouth * 7).toFixed(1));
-    tongue.setAttribute('opacity', mouth > 0.4 ? 1 : 0);
+    avatarState.mouth = mouthTarget;
     requestAnimationFrame(animate);
   }
   requestAnimationFrame(animate);
-
-  (function blinkLoop() {
-    avatar.classList.add('blink');
-    setTimeout(() => avatar.classList.remove('blink'), 120);
-    setTimeout(blinkLoop, 2000 + Math.random() * 3500);
-  })();
 
   // ---------- 字幕 & 评论区 ----------
   let bubbleTimer;
@@ -304,11 +284,8 @@
   $('#clearBtn').onclick = () => { state.history.length = 0; showBubble('嗯？俺刚才说到哪儿了？'); hideBubbleLater(); };
 
   // 戳一戳（像汤姆猫那样的即时反应，不走 API）
-  $('#avatarWrap').onclick = () => {
-    avatar.classList.remove('poked');
-    void avatar.getBBox();
-    avatar.classList.add('poked');
-    setTimeout(() => avatar.classList.remove('poked'), 500);
+  $('#avatar3d').onclick = () => {
+    avatarState.poke = performance.now();
     if (state.busy || state.speakingCount) return;
     const line = state.pokeLines[Math.floor(Math.random() * state.pokeLines.length)];
     showBubble(line);

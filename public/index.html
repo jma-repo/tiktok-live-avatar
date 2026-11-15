@@ -20,52 +20,8 @@
         <span id="bubbleText"></span>
       </div>
 
-      <div class="avatar-wrap" id="avatarWrap" title="戳戳我">
-        <div class="steam s1"></div><div class="steam s2"></div><div class="steam s3"></div>
-        <svg class="avatar" id="avatar" viewBox="0 0 300 300" aria-label="憨包">
-          <ellipse cx="150" cy="268" rx="96" ry="12" class="shadow" />
-          <g class="body-g">
-            <!-- 小手 -->
-            <g class="arm arm-l"><ellipse cx="62" cy="196" rx="20" ry="14" class="skin" /></g>
-            <g class="arm arm-r"><ellipse cx="238" cy="196" rx="20" ry="14" class="skin" /></g>
-            <!-- 包子身体 -->
-            <path class="skin" d="M150 62 C 96 62 52 120 52 190 C 52 238 92 262 150 262 C 208 262 248 238 248 190 C 248 120 204 62 150 62 Z" />
-            <!-- 褶子 -->
-            <g class="pleats">
-              <path d="M150 64 C 140 82 128 96 112 104" />
-              <path d="M150 64 C 146 86 140 102 132 114" />
-              <path d="M150 64 C 154 86 160 102 168 114" />
-              <path d="M150 64 C 160 82 172 96 188 104" />
-              <path d="M150 64 C 134 76 116 84 96 88" />
-              <path d="M150 64 C 166 76 184 84 204 88" />
-            </g>
-            <circle cx="150" cy="60" r="7" class="dot" />
-            <!-- 脸 -->
-            <g class="face">
-              <g class="eyes">
-                <g class="eye" transform="translate(116 168)">
-                  <ellipse rx="11" ry="13" class="eye-w" />
-                  <circle cx="2" cy="1" r="7" class="pupil" />
-                  <circle cx="5" cy="-3" r="2.5" class="glint" />
-                </g>
-                <g class="eye" transform="translate(184 168)">
-                  <ellipse rx="11" ry="13" class="eye-w" />
-                  <circle cx="-2" cy="1" r="7" class="pupil" />
-                  <circle cx="1" cy="-3" r="2.5" class="glint" />
-                </g>
-              </g>
-              <ellipse cx="96" cy="196" rx="15" ry="9" class="cheek" />
-              <ellipse cx="204" cy="196" rx="15" ry="9" class="cheek" />
-              <path class="smile" id="smile" d="M136 202 Q 150 214 164 202" />
-              <g id="mouthOpen" opacity="0">
-                <ellipse cx="150" cy="206" rx="14" ry="10" id="mouthEllipse" class="mouth" />
-                <ellipse cx="150" cy="212" rx="8" ry="4" id="tongue" class="tongue" />
-              </g>
-              <g class="think-dots"><circle cx="214" cy="120" r="5"/><circle cx="230" cy="104" r="7"/><circle cx="250" cy="84" r="9"/></g>
-            </g>
-          </g>
-        </svg>
-      </div>
+      <div class="avatar3d" id="avatar3d" title="戳戳我"></div>
+      <div class="loading" id="loading">憨包正在出锅…</div>
 
       <div class="counter"></div>
       <ul class="comments" id="comments"></ul>
@@ -114,6 +70,8 @@
       <p class="hint">点一下包子会有戳戳反应。OBS 采集地址：<code>/?obs=1</code></p>
     </aside>
   </main>
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+  <script type="module" src="avatar3d.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
