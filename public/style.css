@@ -1,0 +1,167 @@
+:root {
+  --bg: #1d1712;
+  --panel: #2a221b;
+  --card: #352b22;
+  --text: #f6ead8;
+  --muted: #b8a58c;
+  --accent: #ff9f43;
+  --skin: #fff2d9;
+  --skin-line: #d9b98a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+button, input, select { font: inherit; }
+
+.layout { display: flex; gap: 20px; justify-content: center; align-items: flex-start; padding: 16px; min-height: 100%; }
+
+/* ---------- 舞台 ---------- */
+.stage {
+  position: relative;
+  width: min(calc((100vh - 32px) * 9 / 16), 100%);
+  aspect-ratio: 9 / 16;
+  flex-shrink: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #6b3b1c 0%, #b8682e 38%, #e7a25a 62%, #8a5530 62.2%, #a8693c 100%);
+  box-shadow: 0 10px 40px rgba(0,0,0,.5);
+  user-select: none;
+}
+.window {
+  position: absolute; right: 8%; top: 14%; width: 34%; height: 26%;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 22%, #5a2f14 22% 25%),
+    repeating-linear-gradient(0deg, transparent 0 30%, #5a2f14 30% 34%),
+    radial-gradient(circle at 50% 40%, #fff3c4, #f2b765);
+  border: 6px solid #5a2f14; border-radius: 6px; opacity: .85;
+}
+.lantern {
+  position: absolute; top: 4%; width: 13%; aspect-ratio: 3/4; border-radius: 45%;
+  background: radial-gradient(circle at 50% 45%, #fff1b0, #ff8a3d 60%, #b8401b);
+  box-shadow: 0 0 40px 10px rgba(255,170,80,.45);
+  animation: sway 4s ease-in-out infinite;
+  transform-origin: 50% -40%;
+}
+.lantern::before { content: ""; position: absolute; left: 48%; top: -60%; width: 4%; height: 60%; background: #3a2010; }
+.lantern.l1 { left: 10%; }
+.lantern.l2 { left: 38%; animation-delay: -1.5s; }
+@keyframes sway { 50% { transform: rotate(4deg); } }
+.counter {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
+  background: linear-gradient(180deg, #c58a55, #8f5a33);
+  border-top: 6px solid #e9b884;
+}
+.ai-tag {
+  position: absolute; right: 4%; top: 2.5%;
+  font-size: clamp(10px, 1.6vh, 14px);
+  background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 999px; color: #fff;
+}
+
+/* ---------- 包子 ---------- */
+.avatar-wrap {
+  position: absolute; left: 50%; bottom: 14%; width: 82%;
+  transform: translateX(-50%); z-index: 2; cursor: pointer;
+}
+.avatar { width: 100%; display: block; overflow: visible; }
+.avatar .skin { fill: var(--skin); stroke: var(--skin-line); stroke-width: 3; }
+.avatar .shadow { fill: rgba(60,30,10,.35); }
+.avatar .pleats path { fill: none; stroke: var(--skin-line); stroke-width: 3; stroke-linecap: round; }
+.avatar .dot { fill: #ff6b5a; }
+.avatar .eye-w { fill: #fff; stroke: #3b2a1a; stroke-width: 2.5; }
+.avatar .pupil { fill: #2b1d12; }
+.avatar .glint { fill: #fff; }
+.avatar .cheek { fill: #ffaaa0; opacity: .7; }
+.avatar .smile { fill: none; stroke: #6b3a1e; stroke-width: 4; stroke-linecap: round; }
+.avatar .mouth { fill: #7a2a22; stroke: #5a1d14; stroke-width: 2.5; }
+.avatar .tongue { fill: #ff8080; }
+.avatar .eye { transition: transform .08s; }
+.avatar .eyes { transform-origin: 150px 168px; transition: transform .08s; }
+.avatar.blink .eyes { transform: scaleY(.1); }
+.avatar .think-dots circle { fill: #fff; stroke: var(--skin-line); stroke-width: 2; opacity: 0; }
+
+.body-g { transform-origin: 150px 262px; animation: idle 3s ease-in-out infinite; }
+@keyframes idle { 50% { transform: scale(1.02, .98); } }
+.avatar.speaking .body-g { animation: talk .35s ease-in-out infinite; }
+@keyframes talk { 50% { transform: scale(.98, 1.03) translateY(-3px); } }
+.avatar.speaking .arm-l { animation: wave-l .5s ease-in-out infinite; transform-origin: 80px 196px; }
+.avatar.speaking .arm-r { animation: wave-r .5s ease-in-out infinite; transform-origin: 220px 196px; }
+@keyframes wave-l { 50% { transform: rotate(-18deg) translateY(-6px); } }
+@keyframes wave-r { 50% { transform: rotate(18deg) translateY(-6px); } }
+.avatar.thinking .think-dots circle { animation: dots 1.2s infinite; }
+.avatar.thinking .think-dots circle:nth-child(2) { animation-delay: .2s; }
+.avatar.thinking .think-dots circle:nth-child(3) { animation-delay: .4s; }
+@keyframes dots { 0%, 100% { opacity: .15; } 40% { opacity: 1; } }
+.avatar.thinking .pupil { transform: translate(-3px, -4px); }
+.avatar.listening .body-g { animation: lean 1s ease-in-out infinite; }
+@keyframes lean { 50% { transform: rotate(-3deg); } }
+.avatar.poked .body-g { animation: squish .45s ease-out; }
+@keyframes squish { 30% { transform: scale(1.12, .82); } 60% { transform: scale(.94, 1.08); } }
+
+.steam { position: absolute; top: 2%; width: 8%; height: 18%; border-radius: 50%;
+  background: radial-gradient(rgba(255,255,255,.55), transparent 70%); animation: steam 3s ease-in infinite; opacity: 0; }
+.steam.s1 { left: 36%; } .steam.s2 { left: 48%; animation-delay: 1s; } .steam.s3 { left: 58%; animation-delay: 2s; }
+@keyframes steam { 0% { transform: translateY(20%) scale(.6); opacity: 0; } 30% { opacity: .9; } 100% { transform: translateY(-80%) scale(1.4); opacity: 0; } }
+
+/* ---------- 字幕气泡 ---------- */
+.bubble {
+  position: absolute; left: 6%; right: 6%; top: 27%; z-index: 3;
+  background: #fff8ec; color: #3b2a1a; border-radius: 18px;
+  padding: 12px 16px; font-size: clamp(14px, 2.4vh, 22px); font-weight: 600; line-height: 1.45;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  transition: opacity .3s;
+}
+.bubble.hidden { opacity: 0; }
+.bubble-to { background: #ffd9a8; color: #8a4a12; border-radius: 8px; padding: 0 6px; margin-right: 6px; }
+.bubble-to:empty { display: none; }
+
+/* ---------- 评论区 ---------- */
+.comments {
+  position: absolute; left: 4%; bottom: 4%; width: 70%; z-index: 4;
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: clamp(11px, 1.8vh, 16px);
+}
+.comments li { background: rgba(0,0,0,.4); color: #fff; padding: 4px 10px; border-radius: 12px; width: fit-content; max-width: 100%; animation: pop .25s; }
+.comments li b { color: #ffd38a; font-weight: 600; margin-right: 6px; }
+@keyframes pop { from { transform: translateY(8px); opacity: 0; } }
+.interim { position: absolute; left: 4%; right: 4%; top: 21%; z-index: 4; text-align: center; color: #fff; text-shadow: 0 1px 3px #000; font-size: clamp(12px, 2vh, 18px); }
+
+/* ---------- 控制面板 ---------- */
+.panel { width: 360px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.panel h1 { margin: 4px 0 0; font-size: 22px; }
+.panel h1 small { color: var(--muted); font-weight: 400; font-size: 14px; }
+.panel h2 { margin: 0 0 10px; font-size: 15px; }
+.status { margin: 0; font-size: 13px; color: var(--muted); }
+.status.warn { color: #ffcb6b; }
+.card { background: var(--card); border-radius: 12px; padding: 14px; }
+.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; line-height: 1.5; }
+.row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; flex-wrap: wrap; }
+.row input[type=range] { flex: 1; }
+.row select, .row input:not([type=range]) { flex: 1; min-width: 0; }
+input, select { background: #1f1913; color: var(--text); border: 1px solid #4a3c2f; border-radius: 8px; padding: 6px 8px; }
+button { background: #4a3c2f; color: var(--text); border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { background: #5a4a3a; }
+button.big { width: 100%; padding: 12px; font-size: 16px; background: var(--accent); color: #2a1a08; font-weight: 700; }
+button.big.on { background: #e5484d; color: #fff; }
+.comment-form { display: flex; gap: 6px; }
+.comment-form .name { width: 76px; }
+.comment-form input:not(.name) { flex: 1; min-width: 0; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.quick button { font-size: 12px; padding: 4px 8px; }
+code { background: #1f1913; padding: 1px 5px; border-radius: 4px; }
+
+@media (max-width: 760px) {
+  .layout { flex-direction: column; align-items: center; }
+  .stage { width: 100%; }
+}
+
+/* OBS 采集模式：只显示舞台并铺满 */
+body.obs { background: #000; }
+body.obs .panel { display: none; }
+body.obs .layout { padding: 0; }
+body.obs .stage { width: min(100vw, calc(100vh * 9 / 16)); border-radius: 0; }

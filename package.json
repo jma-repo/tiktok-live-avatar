@@ -1,0 +1,13 @@
+{
+  "name": "tiktok-live-avatar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "虚拟主播 POC：麦克风/评论 → DeepSeek → 语音 + 动画形象",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
