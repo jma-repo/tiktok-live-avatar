@@ -1,6 +1,6 @@
-# 憨包直播间（POC）
+# Bao 直播间（POC）
 
-一个憨憨的 3D 南瓜小包子虚拟主播（Three.js 实时渲染，代码建模，不需要模型文件）：你对着麦克风说话，或者输入模拟评论，它就会用 DeepSeek 想出回复，再用语音念出来，同时张嘴、晃身体。戳它一下也会有反应，有点像汤姆猫。
+一个说英文的、憨憨的 3D 南瓜小包子虚拟主播 Bao（Three.js 实时渲染，代码建模，不需要模型文件）：你对着麦克风说话，或者输入模拟评论，它就会用 DeepSeek 想出回复，再用语音念出来，同时张嘴、晃身体。戳它一下也会有反应，有点像汤姆猫。
 
 ```
 麦克风 / 评论 → 语音识别 → DeepSeek（流式）→ 按句切分 → 浏览器 TTS → 嘴型动画
@@ -32,7 +32,16 @@
 - 画面右上角固定显示「虚拟主播 · AI生成内容」标识
 
 ## 改人设
-编辑 `persona.js`：系统提示词、戳一戳台词、模拟模式台词都在这里。
+- 编辑 `persona.js`：系统提示词、标题（Ask me anything~）、戳一戳台词都在这里
+- 完整的角色设定和 Gemini 生图提示词在 [`docs/character.md`](docs/character.md)
+- 想换背景：把图片存成 `public/bg.jpg`，然后刷新网页
+
+## 更自然的声音（ElevenLabs）
+1. 去 https://elevenlabs.io 注册，点头像 → **API Keys** → 新建一个 Key
+2. 在 `.env` 里加一行 `ELEVENLABS_API_KEY=你的key`，然后重新启动
+3. 网页「声音」里，语音引擎选 ElevenLabs，再选音色。想要可爱的音色，去 **Voice Library** 搜 cute / cartoon / squeaky，加到 My Voices，然后刷新网页
+4. 用 ElevenLabs 时，嘴型会跟着**真实音量**动
+5. 免费方案：用 **Edge** 浏览器，音色选 **Microsoft Ana Online (Natural)**（小孩音）
 
 ## 接 OBS（以后要直播时用）
 - 打开 `http://localhost:3000/?obs=1`，这个页面只显示直播画面。按 `M` 开关麦克风，按 `Esc` 让它闭嘴

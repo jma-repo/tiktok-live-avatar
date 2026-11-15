@@ -27,7 +27,9 @@ button, input, select { font: inherit; }
   flex-shrink: 0;
   border-radius: 18px;
   overflow: hidden;
+  /* 有 public/bg.jpg 就用图片当背景（比如 Gemini 生成的店铺图），没有就用渐变 */
   background:
+    url("bg.jpg") center / cover no-repeat,
     linear-gradient(180deg, #6b3b1c 0%, #b8682e 38%, #e7a25a 62%, #8a5530 62.2%, #a8693c 100%);
   box-shadow: 0 10px 40px rgba(0,0,0,.5);
   user-select: none;
@@ -56,8 +58,22 @@ button, input, select { font: inherit; }
   background: linear-gradient(180deg, #c58a55, #8f5a33);
   border-top: 6px solid #e9b884;
 }
+.stage-title {
+  position: absolute; left: 0; right: 0; top: 4%; z-index: 5; margin: 0;
+  text-align: center;
+  font-family: "Fredoka", "Arial Rounded MT Bold", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(22px, 5.2vh, 52px);
+  color: #fff6df;
+  letter-spacing: .02em;
+  -webkit-text-stroke: clamp(1px, .35vh, 3px) #8a3d10;
+  paint-order: stroke fill;
+  text-shadow: 0 .4vh 0 #8a3d10, 0 .8vh 18px rgba(0,0,0,.35);
+  animation: titleBob 2.4s ease-in-out infinite;
+}
+@keyframes titleBob { 50% { transform: translateY(-.6vh) rotate(-1deg); } }
 .ai-tag {
-  position: absolute; right: 4%; top: 2.5%;
+  position: absolute; right: 4%; top: 13%;
   font-size: clamp(10px, 1.6vh, 14px);
   background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 999px; color: #fff;
 }
