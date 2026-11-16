@@ -10,20 +10,20 @@
   <main class="layout">
     <!-- 直播画面（9:16），OBS 采集这一块 -->
     <section class="stage" id="stage">
-      <div class="lantern l1"></div>
-      <div class="lantern l2"></div>
-      <div class="window"></div>
       <div class="ai-tag">虚拟主播 · AI生成内容</div>
 
-      <div class="bubble hidden" id="bubble">
+      <div class="bubble" id="bubble">
         <span class="bubble-to" id="bubbleTo"></span>
         <span id="bubbleText"></span>
+        <small id="bubbleSub"></small>
       </div>
 
-      <div class="avatar3d" id="avatar3d" title="戳戳我"></div>
-      <div class="loading" id="loading">憨包正在出锅…</div>
+      <div class="avatar" id="avatar" title="戳戳我">
+        <img src="avatar/body.webp" alt="" />
+        <img class="eyes" src="avatar/eyes.webp" alt="" />
+        <img class="mouth" src="avatar/mouth.webp" alt="" />
+      </div>
 
-      <div class="counter"></div>
       <ul class="comments" id="comments"></ul>
       <div class="interim" id="interim"></div>
     </section>
@@ -32,12 +32,19 @@
     <aside class="panel">
       <h1>憨包直播间 <small>POC</small></h1>
       <p class="status" id="status">连接中…</p>
+      <p class="status" id="liveStatus">TikTok 评论：连接中…</p>
 
       <div class="card">
         <h2>🎙 用麦克风和它聊</h2>
         <button id="micBtn" class="big">开启麦克风</button>
         <p class="hint" id="micHint">它说话时会自动暂停收音，避免听到自己。建议戴耳机。</p>
         <label class="row">我的称呼 <input id="hostName" value="主播" maxlength="12" /></label>
+        <label class="row">直播语言
+          <select id="langSel">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
       </div>
 
       <div class="card">
@@ -57,8 +64,12 @@
 
       <div class="card">
         <h2>🔊 声音</h2>
-        <label class="row">音色 <select id="voiceSel"></select></label>
-        <label class="row">音调 <input type="range" id="pitch" min="0.5" max="2" step="0.1" value="1.6" /><span id="pitchV"></span></label>
+        <label class="row">音色
+          <select id="voiceSel">
+            <option value="stella">女声 stella</option>
+            <option value="tide">男声 tide</option>
+          </select>
+        </label>
         <label class="row">语速 <input type="range" id="rate" min="0.6" max="1.6" step="0.05" value="1.05" /><span id="rateV"></span></label>
         <div class="row">
           <button id="testVoice">试听</button>
@@ -70,8 +81,7 @@
       <p class="hint">点一下包子会有戳戳反应。OBS 采集地址：<code>/?obs=1</code></p>
     </aside>
   </main>
-  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
-  <script type="module" src="avatar3d.js"></script>
+  <script src="avatar.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

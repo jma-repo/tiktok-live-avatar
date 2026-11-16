@@ -27,34 +27,10 @@ button, input, select { font: inherit; }
   flex-shrink: 0;
   border-radius: 18px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #6b3b1c 0%, #b8682e 38%, #e7a25a 62%, #8a5530 62.2%, #a8693c 100%);
+  /* 拉伸铺满而不是 cover：图层位置按原图百分比算，必须和背景一一对应（原图比例和 9:16 只差 0.7%） */
+  background: #3a2414 url(avatar/bg.webp) center / 100% 100%;
   box-shadow: 0 10px 40px rgba(0,0,0,.5);
   user-select: none;
-}
-.window {
-  position: absolute; right: 8%; top: 14%; width: 34%; height: 26%;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 22%, #5a2f14 22% 25%),
-    repeating-linear-gradient(0deg, transparent 0 30%, #5a2f14 30% 34%),
-    radial-gradient(circle at 50% 40%, #fff3c4, #f2b765);
-  border: 6px solid #5a2f14; border-radius: 6px; opacity: .85;
-}
-.lantern {
-  position: absolute; top: 4%; width: 13%; aspect-ratio: 3/4; border-radius: 45%;
-  background: radial-gradient(circle at 50% 45%, #fff1b0, #ff8a3d 60%, #b8401b);
-  box-shadow: 0 0 40px 10px rgba(255,170,80,.45);
-  animation: sway 4s ease-in-out infinite;
-  transform-origin: 50% -40%;
-}
-.lantern::before { content: ""; position: absolute; left: 48%; top: -60%; width: 4%; height: 60%; background: #3a2010; }
-.lantern.l1 { left: 10%; }
-.lantern.l2 { left: 38%; animation-delay: -1.5s; }
-@keyframes sway { 50% { transform: rotate(4deg); } }
-.counter {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
-  background: linear-gradient(180deg, #c58a55, #8f5a33);
-  border-top: 6px solid #e9b884;
 }
 .ai-tag {
   position: absolute; right: 4%; top: 2.5%;
@@ -62,22 +38,33 @@ button, input, select { font: inherit; }
   background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 999px; color: #fff;
 }
 
-/* ---------- 3D 形象 ---------- */
-.avatar3d { position: absolute; inset: 0; z-index: 2; cursor: pointer; }
-.avatar3d canvas { width: 100%; height: 100%; display: block; }
-.loading { position: absolute; left: 0; right: 0; top: 55%; text-align: center; color: #fff; z-index: 1; font-size: clamp(12px, 2vh, 18px); }
+/* ---------- 形象（位置、锚点都来自抠图时的坐标） ---------- */
+.avatar {
+  position: absolute; left: 19.406%; top: 53.809%; width: 63.287%; height: 33.984%; z-index: 2;
+  cursor: pointer; transform-origin: 50% 100%;
+}
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.avatar .eyes { transform-origin: 50% 51.87%; }
+.avatar .mouth { transform-origin: 49.45% 59.77%; }
 
-/* ---------- 字幕气泡 ---------- */
+/* ---------- 字幕气泡（空闲时显示欢迎语） ---------- */
 .bubble {
   position: absolute; left: 6%; right: 6%; top: 27%; z-index: 3;
   background: #fff8ec; color: #3b2a1a; border-radius: 18px;
   padding: 12px 16px; font-size: clamp(14px, 2.4vh, 22px); font-weight: 600; line-height: 1.45;
   box-shadow: 0 6px 20px rgba(0,0,0,.25);
-  transition: opacity .3s;
 }
-.bubble.hidden { opacity: 0; }
+.bubble::after {
+  content: ""; position: absolute; left: 50%; bottom: -12px; margin-left: -12px;
+  border: 12px solid transparent; border-bottom: 0; border-top-color: #fff8ec;
+}
 .bubble-to { background: #ffd9a8; color: #8a4a12; border-radius: 8px; padding: 0 6px; margin-right: 6px; }
 .bubble-to:empty { display: none; }
+.bubble small { display: block; margin-top: 4px; font-size: .72em; font-weight: 500; color: #8a6a4a; }
+.bubble small:empty { display: none; }
+.bubble.idle { text-align: center; left: 14%; right: 14%; animation: float 3.2s ease-in-out infinite; }
+.bubble.idle #bubbleText { font-size: 1.3em; color: #c0561b; }
+@keyframes float { 50% { transform: translateY(-6px); } }
 
 /* ---------- 评论区 ---------- */
 .comments {
@@ -124,4 +111,7 @@ code { background: #1f1913; padding: 1px 5px; border-radius: 4px; }
 body.obs { background: #000; }
 body.obs .panel { display: none; }
 body.obs .layout { padding: 0; }
-body.obs .stage { width: min(100vw, calc(100vh * 9 / 16)); border-radius: 0; }
+/* 舞台铺满整个窗口：窗口比例和 9:16 有点出入时宁可轻微拉伸，也不在直播画面里留黑边 */
+body.obs .stage { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; }
+/* TikTok 手机端自己的评论区就在画面下方，直播画面里不再重复显示评论列表 */
+body.obs .comments { display: none; }
