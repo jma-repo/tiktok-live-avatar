@@ -1,8 +1,8 @@
-// 虚拟主播 POC 前端
-// 流程：麦克风(Web Speech) / 评论 → /api/chat(流式) → 按句切分 → TTS（ElevenLabs 或浏览器）→ 3D 嘴型
+// 憨包直播间 POC 前端
+// 流程：麦克风(Web Speech) / 评论 → /api/chat(流式) → 按句切分 → /api/tts(DeepSeek TTS) → 按音量动嘴
 (() => {
   const $ = (s) => document.querySelector(s);
-  const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(location.search);
   if (params.has('obs')) document.body.classList.add('obs');
 
   const store = {
@@ -11,45 +11,65 @@
   };
 
   const state = {
-    history: [],      // 发给模型的对话记忆
     queue: [],        // 待回复的消息
     busy: false,      // 正在请求/回复
-    speakingCount: 0, // 排队中/正在播报的句子数
+    speakingCount: 0, // 正在排队播报的句子数
     micOn: false,
-    pokeLines: ['Hey!'],
-    eleven: false
+    pokeLines: { zh: ['哎哟！'], en: ['Ouch!'] }
   };
 
-  // 3D 形象在 avatar3d.js 里读取这个对象
-  const avatarState = (window.avatarState ||= { mouth: 0, speaking: false, mood: null, poke: 0 });
-  const setMood = (mood) => { avatarState.mood = mood; };
+  const LANGS = {
+    zh: {
+      rec: 'zh-CN', welcome: ['嗨，俺是憨包！', '有啥想问的，评论区尽管问～'],
+      testLine: '嘿嘿，俺是憨包，你听俺的声音可爱不？', stuckLine: '哎呀，俺脑子卡住了……', clearedLine: '嗯？俺刚才说到哪儿了？'
+    },
+    en: {
+      rec: 'en-US', welcome: ["Hi, my name is Bao!", 'Ask me anything in the comments~'],
+      testLine: "Hehe, I'm Bao. Do you like my voice?", stuckLine: 'Oops, my brain got stuck...', clearedLine: 'Hmm? Where was I?'
+    }
+  };
+  const langSel = $('#langSel');
+  langSel.value = store.get('lang', langSel.value);
 
   // ---------- 服务状态 ----------
   fetch('/api/status').then((r) => r.json()).then((s) => {
     state.pokeLines = s.pokeLines || state.pokeLines;
-    state.eleven = s.eleven;
-    if (s.title) $('#stageTitle').textContent = s.title;
-    if (s.name) { $('#hostTitle').textContent = s.name; document.title = `${s.name} Live`; }
+    if (!store.get('lang', '')) applyLang(s.lang); // 这个浏览器没手动选过语言，就用 .env 里的 STREAM_LANG（直播窗口没有面板可选）
+    if (params.has('obs') && s.idleSeconds > 0) startIdleTalk(s.idleSeconds);
     const el = $('#status');
-    el.textContent = s.mock
-      ? '⚠ 模拟模式：没有配置 DEEPSEEK_API_KEY，只会说预设台词'
-      : `✅ 已连接 DeepSeek（${s.model}）`;
-    el.classList.toggle('warn', s.mock);
-    setupEleven(s);
-  }).catch(() => { $('#status').textContent = '❌ 连不上服务器，确认 node server.js 在运行'; });
+    if (s.mock) {
+      el.textContent = '⚠ 模拟模式：没有配置 DEEPSEEK_API_KEY，只显示预设台词，不出声';
+      el.classList.add('warn');
+    } else {
+      el.textContent = `✅ 已连接 DeepSeek（${s.model}）`;
+    }
+  }).catch(() => { $('#status').textContent = '❌ 连不上服务器，确认 npm start 在运行'; });
+
+  // ---------- 形象状态（avatar.js 读取 window.avatarState） ----------
+  const avatarState = (window.avatarState ||= { mouth: 0, speaking: false, mood: null, poke: 0 });
+  function setMood(mood) { avatarState.mood = mood; }
 
   // ---------- 字幕 & 评论区 ----------
   let bubbleTimer;
+  function setBubble(to, text, sub, idle) {
+    $('#bubble').classList.toggle('idle', idle);
+    $('#bubbleTo').textContent = to;
+    $('#bubbleText').textContent = text;
+    $('#bubbleSub').textContent = sub;
+  }
   function showBubble(text, to) {
     clearTimeout(bubbleTimer);
-    $('#bubbleTo').textContent = to ? '@' + to : '';
-    $('#bubbleText').textContent = text;
-    $('#bubble').classList.remove('hidden');
+    setBubble(to ? '@' + to : '', text, '', false);
   }
-  function hideBubbleLater() {
+  function showWelcome() {
+    const [title, sub] = LANGS[langSel.value].welcome;
+    setBubble('', title, sub, true);
+  }
+  function welcomeLater() {
     clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(() => $('#bubble').classList.add('hidden'), 6000);
+    bubbleTimer = setTimeout(showWelcome, 6000);
   }
+  showWelcome();
   function addComment(name, text) {
     const li = document.createElement('li');
     const b = document.createElement('b');
@@ -60,82 +80,38 @@
     while (list.children.length > 6) list.firstChild.remove();
   }
 
-  // ---------- 声音设置 ----------
-  const ttsEngine = $('#ttsEngine');
-  const elevenVoice = $('#elevenVoice');
+  // ---------- 语音合成 ----------
   const voiceSel = $('#voiceSel');
-  const pitch = $('#pitch');
   const rate = $('#rate');
-  pitch.value = store.get('pitch', pitch.value);
+  const audio = new Audio();
+  voiceSel.value = store.get('ttsVoice', voiceSel.value);
   rate.value = store.get('rate', rate.value);
-  const showVals = () => { $('#pitchV').textContent = pitch.value; $('#rateV').textContent = rate.value; };
-  showVals();
-  pitch.oninput = () => { store.set('pitch', pitch.value); showVals(); };
-  rate.oninput = () => { store.set('rate', rate.value); showVals(); };
+  const applyRate = () => { $('#rateV').textContent = rate.value; audio.defaultPlaybackRate = Number(rate.value); };
+  applyRate();
+  voiceSel.onchange = () => store.set('ttsVoice', voiceSel.value);
+  rate.oninput = () => { store.set('rate', rate.value); applyRate(); };
 
-  function renderEngine() {
-    const eleven = ttsEngine.value === 'eleven';
-    $('#elevenBox').hidden = !eleven;
-    $('#browserBox').hidden = eleven;
-  }
-  ttsEngine.onchange = () => { store.set('tts', ttsEngine.value); renderEngine(); };
+  const audioCtx = new AudioContext();
+  const analyser = audioCtx.createAnalyser();
+  audioCtx.createMediaElementSource(audio).connect(analyser);
+  analyser.connect(audioCtx.destination);
+  const samples = new Float32Array(analyser.fftSize);
+  const FULL_MOUTH_RMS = 0.17; // 实测 DeepSeek TTS 说话时九成音量（RMS）低于 0.17，到这个值嘴全张开
 
-  async function setupEleven(s) {
-    const opt = ttsEngine.querySelector('option[value=eleven]');
-    if (!s.eleven) {
-      opt.disabled = true;
-      opt.textContent = 'ElevenLabs（未配置 Key）';
-      ttsEngine.value = 'browser';
-      renderEngine();
-      return;
+  function animate() {
+    const speaking = !audio.paused;
+    avatarState.speaking = speaking;
+    let level = 0;
+    if (speaking) {
+      analyser.getFloatTimeDomainData(samples);
+      let sum = 0;
+      for (const v of samples) sum += v * v;
+      level = Math.min(1, Math.sqrt(sum / samples.length) / FULL_MOUTH_RMS);
     }
-    ttsEngine.value = store.get('tts', 'eleven');
-    renderEngine();
-    $('#elevenHint').textContent = '正在读取音色列表…';
-    try {
-      const voices = await (await fetch('/api/voices')).json();
-      elevenVoice.innerHTML = '';
-      for (const v of voices) {
-        const o = document.createElement('option');
-        o.value = v.id;
-        o.textContent = v.desc ? `${v.name}（${v.desc}）` : v.name;
-        elevenVoice.append(o);
-      }
-      const saved = store.get('elevenVoice', '') || s.elevenVoice;
-      if (saved && voices.some((v) => v.id === saved)) elevenVoice.value = saved;
-      $('#elevenHint').textContent = voices.length
-        ? '想要更可爱的声音：去 ElevenLabs 的 Voice Library 搜 "cute" / "cartoon"，加到 My Voices 后刷新这个页面。'
-        : '没读到音色，检查一下 ELEVENLABS_API_KEY。';
-    } catch {
-      $('#elevenHint').textContent = '读取音色列表失败，看一下 PowerShell 窗口里的报错。';
-    }
+    avatarState.mouth = level;
+    requestAnimationFrame(animate);
   }
-  elevenVoice.onchange = () => store.set('elevenVoice', elevenVoice.value);
-
-  // 浏览器自带音色：只列英文，优先 Edge 的 Ana（小孩音）/ 其他 Natural 音色
-  let voices = [];
-  function loadVoices() {
-    const all = speechSynthesis.getVoices();
-    voices = all.filter((v) => /^en/i.test(v.lang));
-    if (!voices.length) voices = all;
-    voices.sort((a, b) => Number(/Natural/i.test(b.name)) - Number(/Natural/i.test(a.name)));
-    const saved = store.get('voice', '');
-    voiceSel.innerHTML = '';
-    voices.forEach((v, i) => {
-      const o = document.createElement('option');
-      o.value = i;
-      o.textContent = `${v.name} (${v.lang})`;
-      voiceSel.append(o);
-    });
-    let idx = voices.findIndex((v) => v.name === saved);
-    if (idx < 0) idx = voices.findIndex((v) => /Ana.*Natural/i.test(v.name));
-    if (idx < 0) idx = voices.findIndex((v) => /Natural/i.test(v.name) && /en-US/i.test(v.lang));
-    if (idx < 0) idx = voices.findIndex((v) => /en-US/i.test(v.lang));
-    voiceSel.value = String(Math.max(0, idx));
-  }
-  speechSynthesis.onvoiceschanged = loadVoices;
-  loadVoices();
-  voiceSel.onchange = () => store.set('voice', voices[voiceSel.value]?.name || '');
+  requestAnimationFrame(animate);
 
   const cleanForSpeech = (s) => s
     .replace(/[*#_`>~\[\]]/g, '')
@@ -143,113 +119,69 @@
     .replace(/\p{Extended_Pictographic}/gu, '')
     .trim();
 
-  // ---------- 播放：ElevenLabs（真实音量驱动嘴型）----------
-  let audioCtx = null, analyser = null, levelBuf = null, currentSrc = null;
-  function ensureAudio() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.connect(audioCtx.destination);
-      levelBuf = new Float32Array(analyser.fftSize);
-    }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  }
-  document.addEventListener('pointerdown', ensureAudio, { once: true });
-  document.addEventListener('keydown', ensureAudio, { once: true });
-
-  async function fetchTTS(text) {
-    const r = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voiceId: elevenVoice.value })
-    });
-    if (!r.ok) throw new Error('tts ' + r.status);
-    return r.arrayBuffer();
-  }
-  async function playAudio(buf) {
-    ensureAudio();
-    const decoded = await audioCtx.decodeAudioData(buf);
-    return new Promise((resolve) => {
-      const src = audioCtx.createBufferSource();
-      src.buffer = decoded;
-      src.connect(analyser);
-      src.onended = () => { if (currentSrc === src) currentSrc = null; resolve(); };
-      currentSrc = src;
-      src.start();
-    });
-  }
-
-  // ---------- 播放：浏览器自带 ----------
-  function speakBrowser(text) {
-    return new Promise((resolve) => {
-      const u = new SpeechSynthesisUtterance(text);
-      const v = voices[voiceSel.value];
-      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'en-US'; }
-      u.pitch = Number(pitch.value);
-      u.rate = Number(rate.value);
-      u.onend = u.onerror = () => resolve();
-      speechSynthesis.speak(u);
-    });
-  }
-
-  // 句子排队播放；ElevenLabs 模式下会提前请求下一句的音频，减少停顿
-  let speechChain = Promise.resolve();
-  let generation = 0;
-  function enqueueSpeech(text) {
+  async function synthesize(text, signal) {
     const t = cleanForSpeech(text);
-    if (!t) return speechChain;
-    const gen = generation;
-    const audioP = ttsEngine.value === 'eleven' && state.eleven
-      ? fetchTTS(t).catch((e) => { console.warn('ElevenLabs 失败，改用浏览器语音', e); return null; })
-      : null;
+    if (!t) return null;
+    try {
+      const r = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t, voice: voiceSel.value }),
+        signal
+      });
+      if (!r.ok) throw new Error('tts ' + r.status);
+      return await r.blob();
+    } catch (err) {
+      if (!signal.aborted) console.warn('语音合成失败，这句只显示字幕', err);
+      return null;
+    }
+  }
+
+  let stopCurrent = () => {};
+  function play(blob) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        audio.pause();
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      stopCurrent = finish;
+      audio.onended = audio.onerror = finish;
+      audio.src = url;
+      audioCtx.resume(); // 自动播放策略：页面被点过之后才能出声
+      audio.play().catch(finish);
+    });
+  }
+
+  // 每句一进来就开始合成，和上一句的播放重叠，句间停顿更短
+  let speechChain = Promise.resolve();
+  let stopCtrl = new AbortController();
+  function enqueueSpeech(text) {
+    const { signal } = stopCtrl;
+    const prefetched = synthesize(text, signal);
     state.speakingCount++;
     updateMic();
-    speechChain = speechChain.then(async () => {
-      if (gen !== generation) return;
-      const buf = audioP && await audioP;
-      if (gen !== generation) return;
-      if (buf) await playAudio(buf);
-      else await speakBrowser(t);
-    }).catch((e) => console.warn(e)).finally(() => {
-      state.speakingCount--;
-      updateMic();
-    });
+    speechChain = speechChain
+      .then(async () => {
+        const blob = await prefetched;
+        if (blob && !signal.aborted) await play(blob);
+      })
+      .finally(() => {
+        state.speakingCount--;
+        updateMic();
+      });
     return speechChain;
   }
   function stopAll() {
-    generation++;
     state.queue.length = 0;
-    speechSynthesis.cancel();
-    try { currentSrc?.stop(); } catch { /* 已经停了 */ }
+    stopCtrl.abort();
+    stopCtrl = new AbortController();
+    stopCurrent();
   }
-
-  // ---------- 嘴型 ----------
-  let mouthTarget = 0, lastFlap = 0;
-  function animate(t) {
-    if (currentSrc && analyser) {
-      // 真实音量 → 嘴巴张开程度
-      analyser.getFloatTimeDomainData(levelBuf);
-      let sum = 0;
-      for (let i = 0; i < levelBuf.length; i++) sum += levelBuf[i] * levelBuf[i];
-      const rms = Math.sqrt(sum / levelBuf.length);
-      avatarState.speaking = true;
-      avatarState.mouth = Math.min(1, Math.max(0, (rms - 0.015) * 9));
-    } else if (state.speakingCount > 0 && speechSynthesis.speaking) {
-      // 浏览器 TTS 拿不到音量，用随机开合模拟（约 8 次/秒）
-      if (t - lastFlap > 120) {
-        mouthTarget = mouthTarget > 0.3 ? Math.random() * 0.25 : 0.45 + Math.random() * 0.55;
-        lastFlap = t;
-      }
-      avatarState.speaking = true;
-      avatarState.mouth = mouthTarget;
-    } else {
-      avatarState.speaking = false;
-      avatarState.mouth = 0;
-    }
-    requestAnimationFrame(animate);
-  }
-  requestAnimationFrame(animate);
 
   // ---------- 对话 ----------
   function submit(name, text) {
@@ -270,27 +202,30 @@
     try {
       await respond(item);
     } catch (err) {
-      console.error(err);
-      showBubble('Oh noodles, my brain got stuck...');
+      if (err.name !== 'AbortError') { // 「闭嘴」中断请求不算出错
+        console.error(err);
+        showBubble(LANGS[langSel.value].stuckLine);
+      }
     } finally {
       state.busy = false;
       setMood(null);
-      hideBubbleLater();
+      welcomeLater();
       updateMic();
       pump();
     }
   }
 
-  async function respond({ name, text }) {
-    state.history.push({ role: 'user', content: `${name}: ${text}` });
-    if (state.history.length > 20) state.history.splice(0, state.history.length - 20);
+  // 观众说话是 { name, text }，冷场主动聊是 { idle: true }。对话记忆在服务端
+  async function respond({ name, text, idle }) {
+    const { signal } = stopCtrl;
     setMood('thinking');
-    showBubble('…', name);
+    showBubble('……', name);
 
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: state.history.slice(-12) })
+      body: JSON.stringify(idle ? { idle, lang: langSel.value } : { name, text, lang: langSel.value }),
+      signal
     });
     if (!res.ok || !res.body) throw new Error('chat failed ' + res.status);
 
@@ -305,23 +240,45 @@
       full += chunk;
       pending += chunk;
       showBubble(full, name);
-      // 一句话说完整就开始念，降低延迟（句号后要跟空格，避免切开 3.5；省略号 ... 不切）
+      // 一句话一结束就开始念，降低延迟。英文句号要后面跟空格才算，避免把 3.5 这类小数切开
       let m;
-      while ((m = pending.match(/^[\s\S]*?(?:(?:(?<!\.)\.(?!\.)|[!?~]+)(?=\s)|[。！？\n]+)/))) {
+      while ((m = pending.match(/^[\s\S]*?(?:[。！？!?…～~\n]+|\.(?=\s))/))) {
         enqueueSpeech(m[0]);
         pending = pending.slice(m[0].length);
       }
     }
     if (pending.trim()) enqueueSpeech(pending);
-    state.history.push({ role: 'assistant', content: full });
+    if (!full) showWelcome(); // 冷场聊天被安全检查拦下时，服务端什么都不回
     await speechChain; // 说完再处理下一条
   }
+
+  // ---------- 冷场时主动聊（只在直播窗口里开，免得几个页面一起说话） ----------
+  let lastActive = Date.now();
+  function startIdleTalk(seconds) {
+    setInterval(() => {
+      if (state.busy || state.queue.length || state.speakingCount) lastActive = Date.now();
+      else if (Date.now() - lastActive >= seconds * 1000) {
+        lastActive = Date.now();
+        state.queue.push({ idle: true });
+        pump();
+      }
+    }, 1000);
+  }
+
+  // ---------- TikTok 直播评论（服务端连直播间推过来，和模拟评论走同一条路） ----------
+  const liveStatusText = {
+    off: () => 'TikTok 评论：没配置，在 .env 里填 TIKTOK_USERNAME 后重启',
+    waiting: (u) => `TikTok 评论：等 @${u} 开播…`,
+    live: (u) => `TikTok 评论：已连上 @${u} 的直播间`
+  };
+  // 直播窗口带上 obs=1：服务端只要看到直播窗口在线，评论就只交给它
+  const live = new EventSource(params.has('obs') ? '/api/live?obs=1' : '/api/live');
+  live.addEventListener('chat', (e) => { const c = JSON.parse(e.data); submit(c.name, c.text); });
+  live.addEventListener('status', (e) => { const s = JSON.parse(e.data); $('#liveStatus').textContent = liveStatusText[s.status](s.username); });
 
   // ---------- 麦克风（Web Speech API，Chrome / Edge 可用） ----------
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const micBtn = $('#micBtn');
-  const recLang = $('#recLang');
-  recLang.value = store.get('recLang', 'en-US');
   let rec = null, recRunning = false;
 
   if (!SR) {
@@ -330,14 +287,15 @@
     $('#micHint').textContent = '请用电脑版 Chrome 或 Edge 打开。也可以先用下面的文字评论测试。';
   } else {
     rec = new SR();
-    rec.lang = recLang.value;
+    rec.lang = LANGS[langSel.value].rec;
     rec.continuous = true;
     rec.interimResults = true;
     rec.onresult = (e) => {
+      lastActive = Date.now(); // 主播正在说话，别让包子插嘴冷场聊天
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
-        if (r.isFinal) submit($('#hostName').value || 'Host', r[0].transcript);
+        if (r.isFinal) submit($('#hostName').value || '主播', r[0].transcript);
         else interim += r[0].transcript;
       }
       $('#interim').textContent = interim;
@@ -357,12 +315,8 @@
       }
     };
   }
-  recLang.onchange = () => {
-    store.set('recLang', recLang.value);
-    if (rec) { rec.lang = recLang.value; if (recRunning) rec.abort(); }
-  };
 
-  // 只在「麦克风开着 且 没在想/说话」时收音，避免它听到自己的声音
+  // 只在「麦克风开着 且 包子没在想/说话」时收音，避免它听到自己的声音
   function updateMic() {
     if (!rec) return;
     const shouldListen = state.micOn && !state.busy && state.speakingCount === 0;
@@ -383,35 +337,43 @@
     updateMic();
   }
   micBtn.onclick = toggleMic;
+  function applyLang(lang) {
+    langSel.value = lang;
+    if ($('#bubble').classList.contains('idle')) showWelcome();
+    if (!rec) return;
+    rec.lang = LANGS[lang].rec;
+    if (recRunning) rec.abort(); // 识别语言要重新 start 才生效，onend 里会自动重启
+  }
+  langSel.onchange = () => {
+    store.set('lang', langSel.value);
+    applyLang(langSel.value);
+  };
 
   // ---------- 其他交互 ----------
   $('#commentForm').onsubmit = (e) => {
     e.preventDefault();
-    submit($('#viewerName').value || 'viewer', $('#commentText').value);
+    submit($('#viewerName').value || '路人', $('#commentText').value);
     $('#commentText').value = '';
   };
   document.querySelectorAll('.quick button').forEach((b) => {
-    b.onclick = () => submit($('#viewerName').value || 'viewer', b.dataset.q);
+    b.onclick = () => submit($('#viewerName').value || '路人', b.dataset.q);
   });
-  $('#testVoice').onclick = () => {
-    const line = "Hehe~ hi, I'm Bao! Do you like my voice?";
-    showBubble(line);
-    enqueueSpeech(line).then(hideBubbleLater);
-  };
+  $('#testVoice').onclick = () => enqueueSpeech(LANGS[langSel.value].testLine);
   $('#stopBtn').onclick = stopAll;
   $('#clearBtn').onclick = () => {
-    state.history.length = 0;
-    showBubble('Huh? What were we talking about?');
-    hideBubbleLater();
+    fetch('/api/clear', { method: 'POST' });
+    showBubble(LANGS[langSel.value].clearedLine);
+    welcomeLater();
   };
 
-  // 戳一戳（像汤姆猫那样的即时反应，不走 DeepSeek）
-  $('#avatar3d').onclick = () => {
+  // 戳一戳（像汤姆猫那样的即时反应，不走 API）
+  $('#avatar').onclick = () => {
     avatarState.poke = performance.now();
     if (state.busy || state.speakingCount) return;
-    const line = state.pokeLines[Math.floor(Math.random() * state.pokeLines.length)];
+    const lines = state.pokeLines[langSel.value];
+    const line = lines[Math.floor(Math.random() * lines.length)];
     showBubble(line);
-    enqueueSpeech(line).then(hideBubbleLater);
+    enqueueSpeech(line).then(welcomeLater);
   };
 
   // 快捷键：M 开关麦克风，Esc 停止（OBS 模式下没有面板时用）

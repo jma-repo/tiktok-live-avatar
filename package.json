@@ -5,9 +5,13 @@
   "description": "虚拟主播 POC：麦克风/评论 → DeepSeek → 语音 + 动画形象",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "stage": "node stage.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "2.5.0"
   }
 }
